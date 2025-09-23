@@ -20,20 +20,22 @@ public class MatchCreateMessageHandler extends ListenerAdapter {
     private final MatchCreateService service;
 
     private static final Pattern P = Pattern.compile(
-            "^!(?<sport>[가-힣]{1,10})\\.(?<session>점심|저녁)\\.(?<size>\\d{1,2})명?$"
+            "^!(?<sport>(축구|농구|배구|배드민턴|탁구))\\.(?<session>(점심|저녁))\\.(?<size>\\d{1,2})명?$"
     );
+
 
     @Override
     public void onMessageReceived(MessageReceivedEvent e) {
         if (e.getAuthor().isBot()) return;
-        var msg = e.getMessage().getContentRaw().trim();
-        var m = P.matcher(msg);
-        if (!m.matches()) return;
+
+        final String raw = e.getMessage().getContentRaw().trim();
+        final var m = P.matcher(raw);
+        if (!m.matches()) return; // 패턴 불일치면 무시
 
         try {
-            MatchSport sport = MatchSport.valueOf(m.group("sport"));
-            MatchSession session = "점심".equals(m.group("session"))
-                    ? MatchSession.LUNCH : MatchSession.DINNER;
+            // ✅ ENUM 내부 파서 사용 (옵션 B)
+            MatchSport sport = MatchSport.fromLabel(m.group("sport"));     // ex) "축구" -> MatchSport.축구
+            MatchSession session = MatchSession.fromLabel(m.group("session")); // "점심"/"저녁" -> LUNCH/DINNER
             int size = Integer.parseInt(m.group("size"));
 
             var res = service.create(new MatchCreateRequest(
@@ -43,25 +45,27 @@ public class MatchCreateMessageHandler extends ListenerAdapter {
                     sport,
                     session,
                     size,
-                    e.getMessageId()
+                    e.getMessage().getId()      // JDA 5: String,  long 쓰면 getIdLong()
             ));
 
             e.getMessage().reply("경기 생성 완료: #" + res.id()
-                    + "\n종목: " + res.sport()
-                    + " | 구간: " + (res.session() == MatchSession.LUNCH ? "점심" : "저녁")
-                    + " | 정원: " + res.maxSize() + "명 | 상태: OPEN"
-            ).queue();
+                            + "\n종목: " + res.sport()
+                            + " | 구간: " + (res.session() == MatchSession.LUNCH ? "점심" : "저녁")
+                            + " | 정원: " + res.maxSize() + "명 | 상태: OPEN")
+                    .queue();
 
         } catch (IllegalArgumentException ex) {
-            // enum valueOf 실패 시
-            e.getMessage().reply("지원하지 않는 종목입니다. (가능: 축구, 농구, 배구, 배드민턴, 탁구)").queue();
+            // fromLabel() 실패(지원하지 않는 라벨, 숫자 파싱 실패 등)
+            e.getMessage().reply("입력 형식/값을 확인해주세요. (예: `!축구.점심.10명`) "
+                    + "종목 가능: 축구/농구/배구/배드민턴/탁구, 구간: 점심|저녁, 인원: 2~30명").queue();
 
         } catch (CustomException ex) {
-            // 서비스 계층에서 던진 명확한 예외
+            // 서비스 정책 예외(정원 범위, 중복 생성 등)
             e.getMessage().reply(ex.getErrorCode().getMessage()).queue();
 
         } catch (Exception ex) {
-            e.getMessage().reply("알 수 없는 오류 발생: " + ex.getClass().getSimpleName()).queue();
+            e.getMessage().reply("알 수 없는 오류: " + ex.getClass().getSimpleName()).queue();
         }
     }
 }
+
