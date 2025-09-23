@@ -9,5 +9,6 @@ public record MatchCreateRequest(
         String hostUserId,
         MatchSport sport,
         MatchSession session,
-        int maxSize
+        int maxSize,
+        String sourceMessageId
 ) {}
