@@ -30,12 +30,11 @@ public class MatchCreateMessageHandler extends ListenerAdapter {
 
         final String raw = e.getMessage().getContentRaw().trim();
         final var m = P.matcher(raw);
-        if (!m.matches()) return; // 패턴 불일치면 무시
+        if (!m.matches()) return;
 
         try {
-            // ✅ ENUM 내부 파서 사용 (옵션 B)
-            MatchSport sport = MatchSport.fromLabel(m.group("sport"));     // ex) "축구" -> MatchSport.축구
-            MatchSession session = MatchSession.fromLabel(m.group("session")); // "점심"/"저녁" -> LUNCH/DINNER
+            MatchSport sport = MatchSport.fromLabel(m.group("sport"));
+            MatchSession session = MatchSession.fromLabel(m.group("session"));
             int size = Integer.parseInt(m.group("size"));
 
             var res = service.create(new MatchCreateRequest(
@@ -45,7 +44,7 @@ public class MatchCreateMessageHandler extends ListenerAdapter {
                     sport,
                     session,
                     size,
-                    e.getMessage().getId()      // JDA 5: String,  long 쓰면 getIdLong()
+                    e.getMessage().getId()
             ));
 
             e.getMessage().reply("경기 생성 완료: #" + res.id()
@@ -55,12 +54,10 @@ public class MatchCreateMessageHandler extends ListenerAdapter {
                     .queue();
 
         } catch (IllegalArgumentException ex) {
-            // fromLabel() 실패(지원하지 않는 라벨, 숫자 파싱 실패 등)
             e.getMessage().reply("입력 형식/값을 확인해주세요. (예: `!축구.점심.10명`) "
                     + "종목 가능: 축구/농구/배구/배드민턴/탁구, 구간: 점심|저녁, 인원: 2~30명").queue();
 
         } catch (CustomException ex) {
-            // 서비스 정책 예외(정원 범위, 중복 생성 등)
             e.getMessage().reply(ex.getErrorCode().getMessage()).queue();
 
         } catch (Exception ex) {
